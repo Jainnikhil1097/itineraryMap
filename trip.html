@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kerala 9-Day Journey</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Playfair+Display:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --glass-bg: rgba(25, 28, 35, 0.6);
+        --glass-border: rgba(255, 255, 255, 0.15);
+        --text-primary: #f0f0f0;
+        --text-secondary: #c4c2c2; /*#b0b0b0;*/
+        --accent-color: #00f2ea;
+        --marker-color: #ff6b6b;
+        --shadow-color: rgba(0, 0, 0, 0.3);
+        --body-bg: #111;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: var(--body-bg);
+        color: var(--text-primary);
+        overflow: hidden;
+        height: 100vh;
+        width: 100vw;
+      }
+
+      #map {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        background-color: #ccc; /* Fallback for light map */
+      }
+
+      .day-btn {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: var(--text-secondary);
+        padding: 4px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: all 0.2s ease;
+      }
+      .day-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: var(--text-primary);
+      }
+      .day-btn.active {
+        background: var(--accent-color);
+        color: black;
+        font-weight: bold;
+        border-color: var(--accent-color);
+      }
+
+      .leaflet-tile-pane {
+        /* Keep map tiles light */
+      }
+
+      .day-header {
+        position: fixed;
+        top: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        text-align: center;
+        pointer-events: none;
+      }
+
+      .day-title {
+        font-family: "Playfair Display", serif;
+        font-size: 3.5em;
+        font-weight: 700;
+        color: #222; /* Text color for dark theme */
+        text-shadow: 0 2px 10px rgba(255, 255, 255, 0.5);
+        /*text-shadow: 0 2px 15px var(--shadow-color);*/
+      }
+
+      .day-subtitle {
+        font-size: 1.2em;
+        color: #555;
+        text-shadow: 0 1px 3px rgba(255, 255, 255, 0.3);
+        margin-top: 5px;
+      }
+
+      .timeline-pane {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 420px;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+        border-right: 1px solid var(--glass-border);
+        z-index: 5;
+        transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        transform: translateX(0);
+        box-shadow: 5px 0 25px rgba(0, 0, 0, 0.2);
+      }
+
+      .timeline-pane.is-hidden {
+        transform: translateX(calc(-100% + 20px));
+        box-shadow: none;
+      }
+
+      .timeline-pane.is-hidden:hover {
+        transform: translateX(0);
+        box-shadow: 5px 0 25px rgba(0, 0, 0, 0.2);
+      }
+
+      .timeline-pane.is-hidden::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 5px;
+        height: 80px;
+        background: var(--accent-color);
+        border-radius: 5px;
+        opacity: 0.3;
+        transition: opacity 0.3s ease;
+      }
+      .timeline-pane:hover::after {
+        opacity: 0;
+      }
+
+      .timeline-header {
+        padding: 20px 20px 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      #togglePaneBtn {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: var(--text-secondary);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1.2em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #togglePaneBtn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: var(--text-primary);
+      }
+
+      #getTipsBtn {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(5px);
+        font-size: 0.9em;
+        font-weight: 500;
+      }
+      #getTipsBtn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0, 242, 234, 0.2);
+      }
+
+      .timeline-content {
+        padding: 20px 40px;
+        flex-grow: 1;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--accent-color) transparent;
+      }
+
+      .timeline-content::-webkit-scrollbar {
+        width: 6px;
+      }
+      .timeline-content::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .timeline-content::-webkit-scrollbar-thumb {
+        background-color: var(--accent-color);
+        border-radius: 6px;
+      }
+
+      .timeline {
+        position: relative;
+        padding: 10px 0 30px 30px;
+      }
+      .timeline::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--glass-border);
+      }
+
+      .timeline-item {
+        position: relative;
+        margin-bottom: 25px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease, opacity 0.3s ease;
+      }
+
+      .timeline-item:not(.selected) {
+        opacity: 0.75;
+      }
+      .timeline-item:hover {
+        opacity: 1;
+        background-color: rgba(78, 205, 196, 0.1);
+      }
+
+      .timeline-item.selected {
+        opacity: 1;
+        background-color: rgba(78, 205, 196, 0.2);
+      }
+
+      .timeline-marker {
+        position: absolute;
+        left: -8px;
+        top: 22px;
+        width: 18px;
+        height: 18px;
+        background: var(--body-bg);
+        border-radius: 50%;
+        border: 2px solid var(--marker-color);
+        transition: all 0.3s ease;
+      }
+
+      .timeline-item:hover .timeline-marker,
+      .timeline-item.selected .timeline-marker {
+        transform: scale(1.2);
+        box-shadow: 0 0 15px var(--marker-color);
+      }
+
+      .timeline-item.selected .timeline-marker {
+        background: var(--accent-color);
+        border-color: var(--accent-color);
+        box-shadow: 0 0 15px var(--accent-color);
+      }
+
+      .timeline-time {
+        font-weight: 500;
+        color: var(--accent-color);
+        font-size: 1.05em;
+        margin-bottom: 8px;
+      }
+      .timeline-title {
+        font-size: 1.3em;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+      }
+      .timeline-description {
+        color: var(--text-secondary);
+        line-height: 1.6;
+        font-size: 1em;
+      }
+
+      .navigation-footer {
+        padding: 20px 40px;
+        text-align: center;
+        color: var(--text-secondary);
+        font-size: 0.9em;
+        flex-shrink: 0;
+      }
+      .navigation-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+      }
+
+      .nav-btn {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1.1em;
+        padding: 5px 10px;
+      }
+      .nav-btn:hover:not(:disabled) {
+        color: var(--text-primary);
+      }
+      .nav-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      .info-pane {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: row;
+        gap: 15px;
+        z-index: 4;
+      }
+
+      .info-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 12px;
+        padding: 15px 20px;
+        border: 1px solid var(--glass-border);
+        color: white;
+        min-width: 160px;
+        box-shadow: 0 4px 20px var(--shadow-color);
+      }
+      .info-card h3 {
+        margin-bottom: 8px;
+        color: var(--accent-color);
+        font-size: 1em;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+      .info-card div {
+        font-size: 1em;
+        color: var(--text-secondary);
+      }
+
+      .pushpin-icon {
+        font-size: 28px;
+        text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+      }
+
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+        display: none;
+        justify-content: center;
+        align-items: center;
+      }
+      .modal-content {
+        background: rgba(30, 30, 35, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 12px;
+        padding: 30px;
+        border: 1px solid var(--glass-border);
+        width: 90%;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+        position: relative;
+        color: var(--text-primary);
+      }
+      .modal-close {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background: none;
+        border: none;
+        font-size: 1.5em;
+        color: var(--text-secondary);
+        cursor: pointer;
+      }
+      .modal-content h2 {
+        color: var(--accent-color);
+        margin-bottom: 15px;
+      }
+      .modal-content p {
+        line-height: 1.6;
+        margin-bottom: 10px;
+      }
+
+      .loader {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid var(--accent-color);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 50px auto;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (max-width: 900px) {
+        .info-pane {
+          display: none;
+        }
+        .timeline-pane {
+          width: 100%;
+          transform: translateX(0);
+          box-shadow: none;
+        }
+        .timeline-pane.is-hidden {
+          transform: translateY(calc(100% - 80px));
+        }
+        .timeline-pane.is-hidden:hover {
+          transform: translateY(0);
+        }
+        #togglePaneBtn {
+          display: none;
+        }
+        .day-header {
+          position: absolute;
+          width: 100%;
+          padding: 0 20px;
+          box-sizing: border-box;
+        }
+        .day-title {
+          font-size: 2.5em;
+        }
+        .day-subtitle {
+          font-size: 1em;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <div class="day-header">
+      <div class="day-title" id="dayTitle">Day 1</div>
+      <div class="day-subtitle" id="daySubtitle">
+        Kochi - Arrival & Fort Kochi Evening
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="timeline-pane" id="timelinePane">
+        <div class="timeline-header">
+          <button id="togglePaneBtn" title="Toggle timeline pane">↔</button>
+          <div
+            id="daySelector"
+            style="display: flex; gap: 5px; flex-wrap: wrap; max-width: 300px"
+          ></div>
+        </div>
+
+        <div class="timeline-content">
+          <div class="timeline" id="timeline"></div>
+        </div>
+        <div class="navigation-footer">
+          <p>Scroll or use arrow keys to navigate days</p>
+          <div class="navigation-buttons">
+            <button class="nav-btn" id="prevBtn">← Previous</button>
+            <button class="nav-btn" id="nextBtn">Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-pane">
+        <div class="info-card">
+          <h3>Budget</h3>
+          <div id="budgetInfo"></div>
+        </div>
+        <div class="info-card">
+          <h3>Stay</h3>
+          <div id="accommodationInfo"></div>
+        </div>
+        <div class="info-card">
+          <h3>Highlights</h3>
+          <div id="highlightsInfo"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for AI Tips -->
+    <div class="modal-overlay" id="tipsModal">
+      <div class="modal-content">
+        <button class="modal-close" id="closeModalBtn">&times;</button>
+        <div id="modalBody">
+          <!-- AI tips will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+      let map;
+      let currentDay = 0;
+      let markers = [];
+      let isChangingDay = false;
+
+      // Itinerary Data
+      const dayData = [
+        {
+          title: "Day 1",
+          subtitle: "Arrival in Cebu - Rest & Explore Nearby",
+          center: [10.3157, 123.8854],
+          budget: "₱3,000",
+          accommodation: "Hotel near Mactan or Cebu City",
+          highlights: "Arrival, local food, light sightseeing",
+          timeline: [
+            {
+              time: "14:00 - 15:00",
+              title: "Arrival in Cebu",
+              description: "Land at Mactan-Cebu Airport and transfer to hotel",
+              coords: [10.3106, 123.9794],
+            },
+            {
+              time: "16:00 - 18:00",
+              title: "Relax & Explore",
+              description: "Visit Ayala Mall or nearby area for early dinner",
+              coords: [10.3173, 123.9058],
+            },
+          ],
+        },
+        {
+          title: "Day 2",
+          subtitle: "Fly to Coron - Explore Town & Sunset Viewpoint",
+          center: [11.9981, 120.2043],
+          budget: "₱4,000",
+          accommodation: "Hotel in Coron Town",
+          highlights: "Flight, Mt. Tapyas, seafood dinner",
+          timeline: [
+            {
+              time: "07:00 - 09:00",
+              title: "Flight to Coron",
+              description: "Take morning flight from Cebu to Busuanga Airport",
+              coords: [12.1214, 120.1018],
+            },
+            {
+              time: "10:00 - 12:00",
+              title: "Check-in & Rest",
+              description: "Arrive in Coron Town, check in at hotel",
+              coords: [11.9981, 120.2043],
+            },
+            {
+              time: "16:00 - 18:00",
+              title: "Mt. Tapyas Hike",
+              description: "Hike Mt. Tapyas for a panoramic sunset view",
+              coords: [12.0041, 120.2016],
+            },
+          ],
+        },
+        {
+          title: "Day 3",
+          subtitle: "Coron to El Nido Expedition Begins",
+          center: [11.9375, 120.2564],
+          budget: "₱6,500",
+          accommodation: "Boat camping",
+          highlights: "Island hopping, snorkeling, camping",
+          timeline: [
+            {
+              time: "08:00 - 17:00",
+              title: "Expedition Day 1",
+              description: "Start 3-day island hopping expedition to El Nido",
+              coords: [11.847, 120.209],
+            },
+          ],
+        },
+        {
+          title: "Day 4",
+          subtitle: "Island Expedition - Remote Beaches & Reefs",
+          center: [11.6811, 120.2789],
+          budget: "₱6,500",
+          accommodation: "Island camping",
+          highlights: "Beaches, caves, snorkeling",
+          timeline: [
+            {
+              time: "08:00 - 17:00",
+              title: "Expedition Day 2",
+              description: "Continue exploring remote beaches and reefs",
+              coords: [11.6811, 120.2789],
+            },
+          ],
+        },
+        {
+          title: "Day 5",
+          subtitle: "Arrive in El Nido - Rest & Sunset",
+          center: [11.2029, 119.4041],
+          budget: "₱5,000",
+          accommodation: "Hotel in El Nido",
+          highlights: "Arrival, Las Cabanas Beach sunset",
+          timeline: [
+            {
+              time: "08:00 - 12:00",
+              title: "Expedition Day 3",
+              description: "Final leg of boat trip, reach El Nido town",
+              coords: [11.2029, 119.4041],
+            },
+            {
+              time: "17:00 - 19:00",
+              title: "Las Cabanas Beach",
+              description: "Watch the sunset and relax at the beachside bars",
+              coords: [11.1608, 119.3807],
+            },
+          ],
+        },
+        {
+          title: "Day 6",
+          subtitle: "Free Day in El Nido",
+          center: [11.2029, 119.4041],
+          budget: "₱3,500",
+          accommodation: "Same hotel in El Nido",
+          highlights: "Beaches, kayaking, relaxing",
+          timeline: [
+            {
+              time: "10:00 - 12:00",
+              title: "Explore Nacpan Beach",
+              description:
+                "Visit Nacpan Beach and enjoy the pristine shoreline",
+              coords: [11.2758, 119.3714],
+            },
+            {
+              time: "14:00 - 17:00",
+              title: "Town Stroll",
+              description: "Walk around El Nido town and shop for souvenirs",
+              coords: [11.2029, 119.4041],
+            },
+          ],
+        },
+        {
+          title: "Day 7",
+          subtitle: "Travel back to Cebu - Wedding Eve",
+          center: [10.3157, 123.8854],
+          budget: "₱5,000",
+          accommodation: "Hotel near Cebu wedding venue",
+          highlights: "Flight & family gathering",
+          timeline: [
+            {
+              time: "08:00 - 10:00",
+              title: "Flight to Cebu",
+              description:
+                "Fly from El Nido to Cebu via AirSWIFT or van+flight",
+              coords: [10.3106, 123.9794],
+            },
+            {
+              time: "12:00 - 16:00",
+              title: "Family Time",
+              description: "Meet family and prep for wedding",
+              coords: [10.3157, 123.8854],
+            },
+          ],
+        },
+        {
+          title: "Day 8",
+          subtitle: "Wedding Day in Cebu",
+          center: [10.3157, 123.8854],
+          budget: "₱8,000",
+          accommodation: "Wedding hotel",
+          highlights: "Ceremony, reception, celebration",
+          timeline: [
+            {
+              time: "08:00 - 23:00",
+              title: "Wedding Events",
+              description: "Attend full-day wedding ceremony and reception",
+              coords: [10.3157, 123.8854],
+            },
+          ],
+        },
+        {
+          title: "Day 9",
+          subtitle: "Kawasan Canyoneering Adventure",
+          center: [9.8083, 123.3833],
+          budget: "₱3,500",
+          accommodation: "Cebu hotel",
+          highlights: "Kawasan Falls, cliff jumps, natural pools",
+          timeline: [
+            {
+              time: "05:00 - 07:00",
+              title: "Travel to Badian",
+              description: "Drive or join tour to Kawasan Falls area",
+              coords: [9.816, 123.401],
+            },
+            {
+              time: "08:00 - 13:00",
+              title: "Canyoneering",
+              description:
+                "Jump, swim, and slide through canyons to Kawasan Falls",
+              coords: [9.8083, 123.3833],
+            },
+          ],
+        },
+        {
+          title: "Day 10",
+          subtitle: "Moalboal Sardine Run & Snorkeling",
+          center: [9.9432, 123.3651],
+          budget: "₱3,200",
+          accommodation: "Same Cebu base",
+          highlights: "Sardine run, turtles, snorkeling",
+          timeline: [
+            {
+              time: "08:00 - 10:00",
+              title: "Snorkeling",
+              description:
+                "Swim with sardines at Panagsama Beach, maybe spot turtles",
+              coords: [9.9432, 123.3651],
+            },
+            {
+              time: "11:00 - 14:00",
+              title: "Beach Time",
+              description: "Lunch and relax at Moalboal beachfront cafés",
+              coords: [9.9432, 123.3651],
+            },
+          ],
+        },
+        {
+          title: "Day 11",
+          subtitle: "Departure from Cebu",
+          center: [10.3106, 123.9794],
+          budget: "₱2,500",
+          accommodation: "—",
+          highlights: "Fly back home from Cebu",
+          timeline: [
+            {
+              time: "09:00 - 11:00",
+              title: "Check-out",
+              description: "Check-out and head to airport",
+              coords: [10.3106, 123.9794],
+            },
+            {
+              time: "12:00 - 14:00",
+              title: "Flight Home",
+              description: "Depart from Mactan-Cebu International Airport",
+              coords: [10.3106, 123.9794],
+            },
+          ],
+        },
+      ];
+
+      function renderDaySelector() {
+        const daySelector = document.getElementById("daySelector");
+        daySelector.innerHTML = "";
+
+        dayData.forEach((day, index) => {
+          const btn = document.createElement("button");
+          btn.textContent = day.title;
+          btn.className = "day-btn";
+          if (index === currentDay) btn.classList.add("active");
+          btn.addEventListener("click", () => {
+            if (currentDay !== index) {
+              currentDay = index;
+              updateUIForDay(currentDay);
+              renderDaySelector(); // re-highlight selected day
+            }
+          });
+          daySelector.appendChild(btn);
+        });
+      }
+
+      function initMap() {
+        // Initialize map and explicitly disable scroll wheel zoom
+        map = L.map("map", {
+          zoomControl: false,
+          attributionControl: false,
+          scrollWheelZoom: false, // This is the key to disable zoom on scroll
+        }).setView([9.9312, 76.2673], 9);
+
+        L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+          {
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          }
+        ).addTo(map);
+      }
+
+      function updateUIForDay(dayIndex) {
+        const day = dayData[dayIndex];
+        document.getElementById("dayTitle").textContent = day.title;
+        document.getElementById("daySubtitle").textContent = day.subtitle;
+
+        const timeline = document.getElementById("timeline");
+        timeline.innerHTML = "";
+        day.timeline.forEach((event, index) => {
+          const timelineItem = document.createElement("div");
+          timelineItem.className = "timeline-item";
+          timelineItem.innerHTML = `<div class="timeline-marker"></div><div class="timeline-time">${event.time}</div><div class="timeline-title">${event.title}</div><div class="timeline-description">${event.description}</div>`;
+
+          timelineItem.addEventListener("click", () => {
+            // Remove 'selected' class from any other item
+            const currentSelected = document.querySelector(
+              ".timeline-item.selected"
+            );
+            if (currentSelected) {
+              currentSelected.classList.remove("selected");
+            }
+            // Add 'selected' class to the clicked item
+            timelineItem.classList.add("selected");
+
+            map.flyTo(event.coords, 16);
+            setTimeout(() => {
+              if (markers[index]) markers[index].openPopup();
+            }, 800);
+          });
+          timeline.appendChild(timelineItem);
+        });
+
+        document.getElementById("budgetInfo").textContent = day.budget;
+        document.getElementById("accommodationInfo").textContent =
+          day.accommodation;
+        document.getElementById("highlightsInfo").textContent = day.highlights;
+
+        markers.forEach((marker) => map.removeLayer(marker));
+        markers = [];
+
+        day.timeline.forEach((event) => {
+          const marker = L.marker(event.coords, {
+            icon: L.divIcon({
+              className: "pushpin-icon",
+              html: `📍`,
+              iconSize: [30, 30],
+              iconAnchor: [15, 30],
+            }),
+          }).addTo(map);
+          marker.bindPopup(`<b>${event.title}</b><br>${event.description}`);
+          markers.push(marker);
+        });
+
+        if (markers.length > 0) {
+          const pane = document.getElementById("timelinePane");
+          const isPaneHidden = pane.classList.contains("is-hidden");
+          const leftPadding = isPaneHidden ? 50 : 440;
+
+          const markerGroup = L.featureGroup(markers);
+          map.flyToBounds(markerGroup.getBounds(), {
+            paddingTopLeft: [leftPadding, 50],
+            paddingBottomRight: [50, 50],
+          });
+        }
+
+        document.getElementById("prevBtn").disabled = dayIndex === 0;
+        document.getElementById("nextBtn").disabled =
+          dayIndex === dayData.length - 1;
+
+        document.querySelector(".timeline-content").scrollTop = 0;
+      }
+
+      function changeDay(direction) {
+        if (isChangingDay) return;
+        const newDay = currentDay + direction;
+        if (newDay >= 0 && newDay < dayData.length) {
+          isChangingDay = true;
+          currentDay = newDay;
+          updateUIForDay(currentDay);
+          setTimeout(() => {
+            isChangingDay = false;
+          }, 700);
+        }
+      }
+
+      async function getTravelTips() {
+        const modal = document.getElementById("tipsModal");
+        const modalBody = document.getElementById("modalBody");
+        modal.style.display = "flex";
+        modalBody.innerHTML = '<div class="loader"></div>';
+
+        const day = dayData[currentDay];
+        const prompt = `You are a helpful travel assistant. Provide practical travel tips for a day in Kerala with the following plan: ${
+          day.subtitle
+        }. The activities include: ${day.timeline
+          .map((t) => t.title)
+          .join(
+            ", "
+          )}. Focus on tips about what to wear for the weather and activities, local etiquette or customs to be aware of, and specific food recommendations for the area. Format the response in HTML with a <h2> for the title and <p> tags for paragraphs.`;
+
+        try {
+          let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+          const payload = { contents: chatHistory };
+          const apiKey = "";
+          const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok)
+            throw new Error(
+              `API request failed with status ${response.status}`
+            );
+
+          const result = await response.json();
+
+          if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
+            const text = result.candidates[0].content.parts[0].text;
+            modalBody.innerHTML = text;
+          } else {
+            throw new Error("Invalid response structure from API.");
+          }
+        } catch (error) {
+          console.error("Error fetching travel tips:", error);
+          modalBody.innerHTML = `<h2>Oops!</h2><p>Sorry, I couldn't fetch travel tips at the moment. Please check your connection or try again later.</p>`;
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        initMap();
+        updateUIForDay(currentDay);
+        renderDaySelector();
+
+        document
+          .getElementById("togglePaneBtn")
+          .addEventListener("click", () => {
+            const pane = document.getElementById("timelinePane");
+            pane.classList.toggle("is-hidden");
+            setTimeout(() => {
+              map.invalidateSize();
+              updateUIForDay(currentDay);
+            }, 500);
+          });
+
+        // This listener handles changing days when scrolling outside the timeline pane
+        window.addEventListener(
+          "wheel",
+          (e) => {
+            // Do not change day if the cursor is over the timeline or modal
+            if (
+              e.target.closest(".timeline-pane") ||
+              e.target.closest(".modal-content")
+            )
+              return;
+
+            e.preventDefault(); // Prevent default scroll action (like page scrolling)
+            if (e.deltaY > 0) {
+              changeDay(1);
+            } else {
+              changeDay(-1);
+            }
+          },
+          { passive: false }
+        );
+
+        document
+          .getElementById("prevBtn")
+          .addEventListener("click", () => changeDay(-1));
+        document
+          .getElementById("nextBtn")
+          .addEventListener("click", () => changeDay(1));
+
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+            changeDay(-1);
+          } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+            changeDay(1);
+          }
+        });
+
+        const tipsModal = document.getElementById("tipsModal");
+        document
+          .getElementById("getTipsBtn")
+          .addEventListener("click", getTravelTips);
+        document
+          .getElementById("closeModalBtn")
+          .addEventListener("click", () => (tipsModal.style.display = "none"));
+        tipsModal.addEventListener("click", (e) => {
+          if (e.target === tipsModal) {
+            tipsModal.style.display = "none";
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
